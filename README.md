@@ -1,75 +1,104 @@
 # React + TypeScript + Vite
+## Основные интерфейсы и типы
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+В проекте используются TypeScript-интерфейсы и типы для описания пользователей, авторизации и задач.
 
-Currently, two official plugins are available:
+### 1. Типы авторизации (`types/auth.ts`)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **RegisterDto** — данные, которые отправляются серверу при регистрации пользователя.
+- **LoginDto** — данные для входа в аккаунт (email и password).
+- **AuthResponse** — ответ сервера после авторизации. Содержит `access_token`, который используется для доступа к защищённым маршрутам API.
 
-## React Compiler
+Пример ответа сервера:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```json
+{
+  "access_token": "JWT_TOKEN"
+}
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Тип задачи (`Todo`)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Описывает структуру задачи:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```ts
+export interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+  description: string;
+}
 ```
+
+Поля:
+- `id` — уникальный идентификатор задачи.
+- `title` — название задачи.
+- `completed` — статус выполнения.
+- `description` — описание задачи.
+
+### 3. Типы операций с задачами
+
+**CreateTodoDto** — данные для создания новой задачи:
+
+```ts
+export type CreateTodoDto = {
+  title: string;
+  description: string;
+};
+```
+
+**UpdateTodoDto** — данные для изменения задачи:
+
+```ts
+export type UpdateTodoDto = Partial<CreateTodoDto>;
+```
+
+`Partial` позволяет передавать только те поля, которые необходимо изменить.
+
+## Обновление списка задач после mutation
+
+Mutation — это операция, которая изменяет данные на сервере.
+
+В приложении используются следующие операции:
+
+- `createTodo` — создание задачи (POST).
+- `updateTodo` — изменение задачи (PATCH).
+- `deleteTodo` — удаление задачи (DELETE).
+
+После успешного выполнения mutation список задач должен обновляться, чтобы интерфейс отображал актуальные данные с сервера.
+
+Последовательность работы:
+
+1. Пользователь выполняет действие: создаёт, изменяет или удаляет задачу.
+2. Компонент вызывает соответствующую API-функцию.
+3. Axios отправляет запрос на сервер с JWT-токеном авторизации.
+4. Сервер выполняет операцию и возвращает результат.
+5. После успешного ответа вызывается повторная загрузка списка задач через `getTodos`.
+6. React обновляет состояние списка задач, и интерфейс отображает актуальные данные.
+
+Пример обновления списка после создания задачи:
+
+```tsx
+const handleCreateTodo = async (todo: CreateTodoDto) => {
+  await createTodo(todo);
+
+  const updatedTodos = await getTodos();
+  setTodos(updatedTodos);
+};
+```
+
+Аналогично список обновляется после изменения и удаления задачи.
+
+Таким образом, после каждой успешной mutation приложение повторно получает актуальный список задач с сервера, что позволяет поддерживать синхронизацию интерфейса с серверными данными.
+
+## Авторизация API-запросов
+
+Для отправки запросов к защищённым маршрутам используется настроенный экземпляр Axios (`axiosInstance`).
+
+JWT-токен сохраняется в `localStorage` под ключом `token` и автоматически добавляется к каждому запросу в заголовок:
+
+```http
+Authorization: Bearer JWT_TOKEN
+```
+
+Это позволяет не добавлять токен вручную при каждом обращении к API.
